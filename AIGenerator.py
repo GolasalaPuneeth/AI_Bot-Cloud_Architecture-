@@ -14,7 +14,8 @@ async def intell(text: str) -> str:
                 {"role": "system", "content": "You are a helpful assistant named dudu."},
                 {"role": "user", "content": f"{text}"},
             ],
-            max_tokens=50
+            max_tokens=40,
+            temperature=0.4
         )
         result = completion.choices[0].message.content
         cache[text] = result
