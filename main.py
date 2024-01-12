@@ -1,19 +1,25 @@
-from fastapi import FastAPI,Body,Form,Request
+from fastapi import FastAPI,Body,Form,Request,File,UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
 import AIGenerator
 from pydantic import BaseModel
 from VoiceGenerator import mapy
+from moviepy.editor import VideoFileClip
 import numpy as np
 from fuzzywuzzy import fuzz, process
 import asyncio
+from Adaptors import *
 from Model import DatabaseManager
 
 app = FastAPI()
 db=DatabaseManager("database.db")
 templates = Jinja2Templates(directory="templates")
 StackData=None
+
+ALLOWED_VIDEO_EXTENSIONS = {"mp4", "mkv"}
+ALLOWED_IMAGE_EXTENSIONS = {"png"} 
 
 
 class User(BaseModel):
@@ -58,8 +64,9 @@ async def UserDB(tree_id: str, input_str: str)  :
     return False
 
 @app.get('/')
-async def Igniter():
+async def Igniter(request: Request):
     asyncio.create_task(background_task())
+    #return templates.TemplateResponse("videocontent.html", {"request": request})
     return {"Service Started running...🔥"}
 
 @app.post('/')
@@ -138,7 +145,48 @@ async def uptodate(item_ID,Tree_ID,request: Request,Question :str = Form(...),An
     result = await db.get_data_user(Tree_ID)
     return templates.TemplateResponse("content.html", {"request": request,"data":result,"ID":Tree_ID})
 
+@app.post("/upload-video")
+async def upload_video(videoName:str = Body(...),Desc:str = Body(...),video_file: UploadFile = File(...),Image_file: UploadFile = File(...)) -> dict:
+    if not allowed_file(video_file.filename, ALLOWED_VIDEO_EXTENSIONS):
+        return {"error": "Invalid video file format. Allowed extensions: {}".format(", ".join(ALLOWED_VIDEO_EXTENSIONS))}
+    if not allowed_file(Image_file.filename, ALLOWED_IMAGE_EXTENSIONS):
+        return {"error": "Invalid image file format. Allowed extensions: {}".format(", ".join(ALLOWED_IMAGE_EXTENSIONS))}
+    fileName= await db.GetMaxForVideo()
+    if fileName is None:
+        file_path = f"static/videos/1.mp4"  # Customize path as needed
+        image_path = f"static/thumbnails/1.png"
+    else:
+        file_path = f"static/videos/{fileName+1}.mp4"  # Customize path as needed
+        image_path = f"static/thumbnails/{fileName+1}.png"
+    await saveFile(file_path,video_file)
+    await saveFile(image_path,Image_file)
+    video_size_in_bytes = os.path.getsize(file_path)
+    video_size_in_mb = video_size_in_bytes / (1024 * 1024)  # 1 MB = 1024 KB = 1024 * 1024 bytes
+    video = VideoFileClip(file_path)
+    duration = video.duration
+    minutes, seconds = divmod(duration, 60)  
+    await db.VideoCreator(VideoName=videoName,Description=Desc,VideoPath=file_path,VideoLengthmin=int(minutes),VideoLengthSec=int(seconds),ThumbPath=image_path,VideoSize=video_size_in_mb)
+    return {"message": "Video uploaded successfully",
+            "size if video":f"{int(video_size_in_mb)} MB",
+            "duration":f"{int(minutes)}:{int(seconds)} Seconds"}
 
+@app.delete("/Delete/{ID}")
+async def DelVideo(ID:str) -> dict:
+    mydata = await db.VideoAndImagePaths(ID)
+    await db.del_Videorecord(ID)
+    if mydata is None:
+        return {"Status":mydata}
+    for item in mydata:
+        await delItemsDIR(item) 
+    return {"Status":mydata}
+
+@app.get("/downloader/{filename}")  # Adapt the route if needed
+async def download_video(filename: str) -> FileResponse or dict:
+    video_path = f"static/videos/{filename}.mp4"  
+    if os.path.exists(video_path):
+        return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
+    else:
+        return {"error": "Video not found"}
 
 if __name__=="__main__":
     uvicorn.run(app)
