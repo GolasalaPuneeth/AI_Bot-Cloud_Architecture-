@@ -128,3 +128,11 @@ class DatabaseManager:
             await cursor.execute(query, (record_id,))
             result = await cursor.fetchone()
             return result
+        
+    async def GetVideoList(self) -> [] : #checked
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            query = "SELECT id, Description, VideoLengthMin, VideoLengthSec, ThumbPath FROM VideoPannel"
+            await cursor.execute(query)
+            result = await cursor.fetchall()
+        return result if result else []

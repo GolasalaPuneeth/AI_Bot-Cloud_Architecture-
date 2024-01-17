@@ -66,8 +66,8 @@ async def UserDB(tree_id: str, input_str: str)  :
 @app.get('/')
 async def Igniter(request: Request):
     asyncio.create_task(background_task())
-    #return templates.TemplateResponse("videocontent.html", {"request": request})
-    return {"Service Started running...🔥"}
+    return templates.TemplateResponse("videocontent.html", {"request": request})
+    #return {"Service Started running...🔥"}
 
 @app.post('/')
 async def MainRunner(user: User = Body(...)):
@@ -165,20 +165,26 @@ async def upload_video(videoName:str = Body(...),Desc:str = Body(...),video_file
     video = VideoFileClip(file_path)
     duration = video.duration
     minutes, seconds = divmod(duration, 60)  
-    await db.VideoCreator(VideoName=videoName,Description=Desc,VideoPath=file_path,VideoLengthmin=int(minutes),VideoLengthSec=int(seconds),ThumbPath=image_path,VideoSize=video_size_in_mb)
+    await db.VideoCreator(VideoName=videoName.lower(),
+                          Description=Desc,
+                          VideoPath=file_path,
+                          VideoLengthmin=int(minutes),
+                          VideoLengthSec=int(seconds),
+                          ThumbPath=image_path, VideoSize=video_size_in_mb)
     return {"message": "Video uploaded successfully",
             "size if video":f"{int(video_size_in_mb)} MB",
             "duration":f"{int(minutes)}:{int(seconds)} Seconds"}
 
-@app.delete("/Delete/{ID}")
-async def DelVideo(ID:str) -> dict:
+@app.get("/Delete/{ID}")
+async def DelVideo(request: Request,ID:str) -> dict or None:
     mydata = await db.VideoAndImagePaths(ID)
     await db.del_Videorecord(ID)
     if mydata is None:
         return {"Status":mydata}
     for item in mydata:
-        await delItemsDIR(item) 
-    return {"Status":mydata}
+        await delItemsDIR(item)
+    myList = await db.GetVideoList()
+    return templates.TemplateResponse("videocontent.html", {"request": request, "ListData":myList})
 
 @app.get("/downloader/{filename}")  # Adapt the route if needed
 async def download_video(filename: str) -> FileResponse or dict:
@@ -187,6 +193,11 @@ async def download_video(filename: str) -> FileResponse or dict:
         return FileResponse(path=video_path, media_type="video/mp4", filename=filename)
     else:
         return {"error": "Video not found"}
+    
+@app.get("/videoList/")
+async def Getlist(request: Request) -> None:
+    myList = await db.GetVideoList()
+    return templates.TemplateResponse("videocontent.html", {"request": request, "ListData":myList}) #and {"Status":"Done"}
 
 if __name__=="__main__":
     uvicorn.run(app)
