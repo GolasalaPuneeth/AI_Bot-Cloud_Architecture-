@@ -199,5 +199,10 @@ async def Getlist(request: Request) -> None:
     myList = await db.GetVideoList()
     return templates.TemplateResponse("videocontent.html", {"request": request, "ListData":myList}) #and {"Status":"Done"}
 
+@app.get("/ListForPi")
+async def ListForPi():
+    EntireList=list(await db.ListToPi())
+    return {"Mydata":EntireList}
+    
 if __name__=="__main__":
     uvicorn.run(app)

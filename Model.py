@@ -101,7 +101,8 @@ class DatabaseManager:
             return result[0]
         
     #this used to create an record in videoPanneel
-    async def VideoCreator(self, VideoName:str, Description:str, VideoSize:int, VideoLengthmin:int, VideoLengthSec:int, VideoPath:str, ThumbPath:str) -> None:
+    async def VideoCreator(self, VideoName:str, Description:str, VideoSize:int, 
+                           VideoLengthmin:int, VideoLengthSec:int, VideoPath:str, ThumbPath:str) -> None:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             query = """INSERT INTO VideoPannel (VideoName, Description, 
@@ -109,7 +110,8 @@ class DatabaseManager:
             VideoLengthSec, VideoPath, 
             ThumbPath) 
             VALUES (?, ?, ?, ?, ?, ?, ?)"""
-            await cursor.execute(query, (VideoName, Description, VideoSize, VideoLengthmin, VideoLengthSec, VideoPath, ThumbPath))
+            await cursor.execute(query, (VideoName, Description, VideoSize, 
+                                         VideoLengthmin, VideoLengthSec, VideoPath, ThumbPath))
             await db.commit()
 
     # used to delete record of video panne
@@ -128,7 +130,7 @@ class DatabaseManager:
             await cursor.execute(query, (record_id,))
             result = await cursor.fetchone()
             return result
-        
+    # Used to show content to template 
     async def GetVideoList(self) -> [] : #checked
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
@@ -136,3 +138,12 @@ class DatabaseManager:
             await cursor.execute(query)
             result = await cursor.fetchall()
         return result if result else []
+    
+    # Used to send list of videos present on DB
+    async def ListToPi(self) ->[]: #checked
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            query = "SELECT GROUP_CONCAT(id, ',') AS list_data FROM VideoPannel;"
+            await cursor.execute(query,)
+            result = await cursor.fetchall()
+            return result[0]
