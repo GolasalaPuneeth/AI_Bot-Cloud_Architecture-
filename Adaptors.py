@@ -10,7 +10,7 @@ async def delItemsDIR(path:str)->True or False:
         print(error)
         return False
 
-async def allowed_file(filename:str, allowed_extensions:set) ->True or None:
+async def allowed_file(filename:str, allowed_extensions:set) ->True or None: # type: ignore
     return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed_extensions
 
 async def saveFile(filePath:str,file:bytes) -> True or False:

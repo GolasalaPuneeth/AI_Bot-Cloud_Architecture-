@@ -82,7 +82,7 @@ class DatabaseManager:
             return result[0]
     
     #fetch answer from core(Admin) table
-    async def GetAnswerFromCore(self,question) ->[]: #checked
+    async def GetAnswerFromCore(self,question:int) ->[]: #checked
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
             query = "SELECT Answer FROM user WHERE Question = ?"
@@ -122,7 +122,7 @@ class DatabaseManager:
             await cursor.execute(delete_query, (record_id,))
             await db.commit()
 
-#SELECT video, image FROM User_ID WHERE ID = ?
+    #SELECT video, image FROM User_ID WHERE ID = ?
     async def VideoAndImagePaths(self,record_id:int) -> (): #checked
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
@@ -130,6 +130,7 @@ class DatabaseManager:
             await cursor.execute(query, (record_id,))
             result = await cursor.fetchone()
             return result
+        
     # Used to show content to template 
     async def GetVideoList(self) -> [] : #checked
         async with aiosqlite.connect(self.db_path) as db:
@@ -143,7 +144,26 @@ class DatabaseManager:
     async def ListToPi(self) ->[]: #checked
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.cursor()
-            query = "SELECT GROUP_CONCAT(id, ',') AS list_data FROM VideoPannel;"
+            query = "SELECT id FROM VideoPannel ORDER BY id ASC"
             await cursor.execute(query,)
             result = await cursor.fetchall()
+            result = [item[0] for item in result]
+            return result
+    
+    #used to get video names list
+    async def GetVideoNameList(self) -> str: #checked
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            query = "SELECT GROUP_CONCAT(VideoName, ',') AS list_data FROM VideoPannel;"
+            await cursor.execute(query,)
+            result = await cursor.fetchone()
+            return result[0]
+        
+    #fetch videoPath from VideoPannel using videoName table
+    async def GetVideoPath(self,VideoName:str) -> str: 
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.cursor()
+            query = "SELECT VideoPath FROM VideoPannel WHERE VideoName = ?"
+            await cursor.execute(query,(VideoName,))
+            result = await cursor.fetchone()
             return result[0]

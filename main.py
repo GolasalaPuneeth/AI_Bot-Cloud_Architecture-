@@ -9,12 +9,14 @@ from VoiceGenerator import mapy
 from moviepy.editor import VideoFileClip
 import numpy as np
 from fuzzywuzzy import fuzz, process
+from typing import Union
 import asyncio
 from Adaptors import *
+#from PostAsync import DatabaseManager
 from Model import DatabaseManager
-
 app = FastAPI()
 db=DatabaseManager("database.db")
+#db = DatabaseManager("postgresql://postgres:Tree_v2@16.171.10.205:5432/TreeBase")
 templates = Jinja2Templates(directory="templates")
 StackData=None
 
@@ -24,11 +26,36 @@ ALLOWED_IMAGE_EXTENSIONS = {"png"}
 
 class User(BaseModel):
     TreeID: str
-    TreeRequest: str    
+    TreeRequest: str
+
+class UserOut(BaseModel):
+    ResponseAudio : str
+    Audio_data : str
+    Path : Union[str,None] = None
+
+
 
 # Mount the static folder
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+async def VideoListArray() -> []:
+   listofnames = await db.GetVideoNameList()
+   words_list = listofnames.split(',') # Split the string at commas
+   words_list = np.array(words_list)
+   return(words_list)
+
+async def GetPath(query:str) -> str or False: # type: ignore
+    query = (query.replace(" ",","))
+    query = np.array(query.split(','))
+    listof = await VideoListArray()
+    for i in query:
+        best_match, highest_ratio = process.extractOne(i,listof, scorer=fuzz.token_sort_ratio) # type: ignore
+        print(highest_ratio)
+        if highest_ratio > 80:
+            return await db.GetVideoPath(best_match)
+    else:
+        return False
 
 async def background_task() -> None:
     global StackData,connection
@@ -55,10 +82,11 @@ async def AdminTable(input_str:str) -> str or False:
 async def UserDB(tree_id: str, input_str: str)  :
     try:
         questions = await db.GetQuestionListUser(tree_id=tree_id)
-        questions= np.array(questions.split(', '))
+        questions= np.array(questions.split(','))
         best_match, highest_ratio = process.extractOne(input_str, questions, scorer=process.fuzz.token_sort_ratio)
         if highest_ratio > 80:
             return await db.GetAnswerWithID(tree_id=tree_id, question=best_match)
+        
     except Exception as e:
         print(f"Error: {e}")
     return False
@@ -76,38 +104,52 @@ async def MainRunner(user: User = Body(...)):
     print(user.TreeRequest)
     RawText = user.TreeRequest
     if "play" in RawText:
-        AudioData = await mapy("As you wish")
-        return {
-            "ResponseAudio":RawText,
-            "Audio_data": AudioData
-            }
+        path = await GetPath(RawText)
+        if path:
+            AudioData = await mapy("As you wish")
+            return {
+                "ResponseAudio":RawText,
+                "Audio_data": AudioData,
+                "Path":path
+                }
+        AudioData = await mapy("Sorry i havent found any video related to that")
+        FireResponse = {
+                "ResponseAudio":RawText,
+                "Audio_data": AudioData,
+                "Path":None
+                }
+        return UserOut(**FireResponse)
     if "time" in RawText:
         AudioData = await mapy("Time in Progress")
-        return {
+        FireResponse = {
             "ResponseAudio":RawText,
             "Audio_data": AudioData
             }
+        return UserOut(**FireResponse)
     RawData = await UserDB(user.TreeID,user.TreeRequest)
     if RawData :
         AudioData = await mapy(RawData)
-        return {
+        FireResponse = {
             "ResponseAudio":RawData,
             "Audio_data": AudioData
             }
+        return UserOut(**FireResponse)
     RawData = await AdminTable(user.TreeRequest)
     if RawData :
         AudioData = await mapy(RawData)
-        return {
+        FireResponse = {
             "ResponseAudio":RawData,
             "Audio_data": AudioData
             }
+        return UserOut(**FireResponse)
     else:
         RawData = await AIGenerator.intell(RawText)
         AudioData = await mapy(RawData)
-        return {
+        FireResponse = {
             "ResponseAudio":RawData,
             "Audio_data": AudioData
             }
+        return UserOut(**FireResponse)
     
 @app.get("/content")
 def read_root(request: Request):
@@ -130,18 +172,18 @@ async def createQuestion(TreeID,request: Request,Question :str = Form(...),Answe
 
 @app.get("/Delete/{Item_ID}/{TreeID}")
 async def DeleteRec(Item_ID,TreeID,request: Request):
-    await db.del_record(Item_ID)
+    await db.del_record(int(Item_ID))
     result = await db.get_data_user(TreeID)
     return templates.TemplateResponse("content.html", {"request": request,"data":result,"ID":TreeID})
 
 @app.get("/update/{item_ID}/{TreeID}")
 async def updateIndex(request: Request,item_ID,TreeID):
-        question_and_answer = await db.updateIndex(record_id=item_ID)
+        question_and_answer = await db.updateIndex(record_id=int(item_ID))
         return templates.TemplateResponse("updated.html", {"request": request,"data":question_and_answer,"details":[TreeID,item_ID]})
 
 @app.post("/update/{item_ID}/{Tree_ID}")
 async def uptodate(item_ID,Tree_ID,request: Request,Question :str = Form(...),Answer :str = Form(...)):
-    await db.update(record_id=item_ID,question=Question,answer=Answer)
+    await db.update(record_id=int(item_ID),question=Question,answer=Answer)
     result = await db.get_data_user(Tree_ID)
     return templates.TemplateResponse("content.html", {"request": request,"data":result,"ID":Tree_ID})
 
@@ -177,8 +219,8 @@ async def upload_video(videoName:str = Body(...),Desc:str = Body(...),video_file
 
 @app.get("/Delete/{ID}")
 async def DelVideo(request: Request,ID:str) -> dict or None:
-    mydata = await db.VideoAndImagePaths(ID)
-    await db.del_Videorecord(ID)
+    mydata = await db.VideoAndImagePaths(int(ID))
+    await db.del_Videorecord(int(ID))
     if mydata is None:
         return {"Status":mydata}
     for item in mydata:

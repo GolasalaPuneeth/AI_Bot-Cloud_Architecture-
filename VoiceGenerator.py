@@ -6,8 +6,8 @@ import base64
 
 
 # Initialize the Polly client
-polly = boto3.client('polly', aws_access_key_id= "aws_access_key_id",
-                     aws_secret_access_key="aws_secret_access_key", region_name="us-east-1")
+polly = boto3.client('polly', aws_access_key_id= "AKIAZIWBZDX3FK4J4K7K",
+                     aws_secret_access_key="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", region_name="us-east-1")
 cache = diskcache.Cache(os.path.join("static/CachePolly/"))
 
  

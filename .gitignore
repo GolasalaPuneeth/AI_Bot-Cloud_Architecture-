@@ -2,3 +2,9 @@
 __pycache__/
 # Ignore virtual environment folder
 venv/
+# Ignore static(templates,videos and etc ...)folder
+static
+static/CachePolly
+static/thumbnails
+static/stylesJS
+static/videos

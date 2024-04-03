@@ -1,0 +1,192 @@
+import asyncpg
+import itertools
+import asyncio
+class DatabaseManager:
+    def __init__(self, connection_string):
+        self.connection_string = connection_string
+
+    # Used to create Questions and answer from user end based on Tree_ID
+    async def ContentCreaterUser(self, tree_id: str, question: str, answer: str) -> None:
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "INSERT INTO user_pannel (TreeID, Question, Answer) VALUES ($1, $2, $3)"
+                await conn.execute(query, tree_id, question, answer)
+
+    # used to delete user record based on record ID
+    async def del_record(self, record_id:int) -> None :
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                delete_query = "DELETE FROM user_pannel WHERE ID = $1"
+                await conn.execute(delete_query, record_id,)
+
+    #used for checking login credentials if write returns "True" else 'False'
+    async def check_credentials(self, username:str, password:str) -> False: 
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT * FROM login_credentialstree WHERE Username = $1 AND password = $2"
+                result = await conn.fetchrow(query, username, password)
+        return result is not None
+    
+    #used to display entire data of perticular user based on Tree_ID
+    async def get_data_user(self, tree_id:str) -> [] : #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT ID, Question, Answer FROM user_pannel WHERE TreeID = $1"
+                result = await conn.fetch(query, tree_id)
+                result_tuples = [tuple(row) for row in result]
+        return result_tuples if result_tuples else []
+    
+    #Used to fetch perticular question and answer form a record based on record ID
+    async def updateIndex(self,record_id:int) -> (): #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT Question, Answer FROM user_pannel WHERE ID = $1"
+                result = await conn.fetchrow(query, record_id)
+            return tuple(result)
+        
+    #used to update record based on record_ID
+    async def update(self, record_id:str, question:str, answer:str)->None : #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "UPDATE user_pannel SET Question = $1, Answer = $2 WHERE ID = $3"
+                await conn.execute(query,question, answer, record_id)
+
+    #used to fetch entire questions related to perticular user
+    async def GetQuestionListUser(self,tree_id:str)->str: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT string_agg(Question, ',') AS list_data FROM user_pannel WHERE TreeID = $1"
+                result = await conn.fetch(query,tree_id)
+                result = list(result[0]) 
+            return result[0]
+
+    #used to fetch perticular answer based on tree_ID and Question
+    async def GetAnswerWithID(self,tree_id:str,question:str) -> str: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT Answer FROM user_pannel WHERE TreeID = $1 AND Question = $2"
+                result = await conn.fetchrow(query,tree_id,question)
+            return result[0]
+
+    #used to fectch entire questions and from Admin table
+    async def GetQuestionListAdmin(self) ->[]: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT string_agg(Question, ',') AS list_data FROM admin_question;"
+                result = await conn.fetch(query)
+                result = list(result[0])
+            return result[0]
+
+    #fetch answer from core(Admin) table
+    async def GetAnswerFromCore(self,question:int) -> str: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT Answer FROM admin_question WHERE Question = $1"
+                result = await conn.fetchrow(query,question)
+            return result[0]
+        
+    #To create video Pannel
+    async def CreateVideoPannel(self) -> None: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    CREATE TABLE VideoPannel (
+                        id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                        VideoName TEXT UNIQUE,
+                        Description TEXT,
+                        VideoSize INTEGER,
+                        VideoLengthMin INTEGER,
+                        VideoLengthSec INTEGER,
+                        VideoPath TEXT,
+                        ThumbPath TEXT
+                    )
+                    """
+                )
+           
+    # this is used to fetch max number of record to assign video name
+    async def GetMaxForVideo(self) -> int or None: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                result = await conn.fetch("SELECT id FROM VideoPannel ORDER BY id DESC LIMIT 1")
+                if result is None:
+                    return result
+                result=list(result[0])
+                return (result[0])
+    
+    #this used to create an record in videoPanneel
+    async def VideoCreator(self, VideoName:str, Description:str, VideoSize:int, 
+                           VideoLengthmin:int, VideoLengthSec:int, VideoPath:str, ThumbPath:str) -> None:
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = """INSERT INTO VideoPannel (VideoName, Description, 
+                VideoSize, VideoLengthmin, 
+                VideoLengthSec, VideoPath, 
+                ThumbPath) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7)"""
+                await conn.execute(query, VideoName, Description, VideoSize, 
+                                            VideoLengthmin, VideoLengthSec, VideoPath, ThumbPath)
+    
+    # used to delete record of video pannel         
+    async def del_Videorecord(self, record_id:int) -> None :
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                delete_query = "DELETE FROM videopannel WHERE ID = $1"
+                await conn.execute(delete_query, record_id,)
+
+    #used to fetch videoPath and thumbpath to delete from cms
+    async def VideoAndImagePaths(self,record_id:int) -> (): #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT VideoPath, ThumbPath FROM VideoPannel WHERE id = $1"
+                #await conn.execute(query,record_id)
+                result = await conn.fetch(query,record_id)
+                result = [item for item in result]
+                return tuple(result[0])
+    
+    # Used to show content to template 
+    async def GetVideoList(self) -> () : #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT id, Description, VideoLengthMin, VideoLengthSec, ThumbPath FROM VideoPannel"
+                #await cursor.execute(query)
+                result = await conn.fetch(query)
+                result = [tuple(item) for item in result]
+        return result if result else []
+
+    # Used to send list of videos present on DB
+    async def ListToPi(self) ->[]: #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT id FROM VideoPannel ORDER BY id ASC"
+                result = await conn.fetch(query)
+                result = [list(item) for item in result]
+            return list(itertools.chain.from_iterable(result))
+        
+    #used to get video names list
+    async def GetVideoNameList(self) -> str : #checked
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT string_agg(VideoName, ',') AS list_data FROM VideoPannel;" 
+                result = await conn.fetch(query)
+                result = list(result[0])
+            return result[0]
+
+    #fetch videoPath from VideoPannel using videoName table
+    async def GetVideoPath(self,VideoName:str) -> str: 
+        async with asyncpg.create_pool(self.connection_string) as pool:
+            async with pool.acquire() as conn:
+                query = "SELECT VideoPath FROM VideoPannel WHERE VideoName = $1"
+                result = await conn.fetchrow(query,VideoName)
+            return result[0]
+
+"""connection_string = "postgresql://postgres:Tree_v2@16.171.10.205:5432/TreeBase"
+db_manager = DatabaseManager(connection_string)
+
+async def main():
+    data = await db_manager.del_Videorecord(3)
+    #data = await db_manager.VideoCreator(VideoName="Dino23345",Description="jhsghgfldgf",VideoSize=12334,VideoLengthmin=1234,VideoPath="afgafdadf",ThumbPath="dfgsfg",VideoLengthSec=1345)
+    print((data))
+
+if __name__ == "__main__":
+    asyncio.run(main())"""
